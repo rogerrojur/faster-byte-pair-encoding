@@ -52,6 +52,15 @@ def merge_vocab(pair, v_in, update_set, pairs, pair2word, tokens):
         w_out = p.sub(pair_combine, word)
         v_in[w_out] = v_in[word]
         del v_in[word]
+        
+        symbols = w_out.split()
+        for i in range(len(symbols)-1):
+            key = (symbols[i], symbols[i+1])
+            pairs[key] += v_in[w_out]
+            pair2word[key].add(w_out)
+            tokens[symbols[i]] += v_in[w_out]
+        tokens[symbols[-1]] += v_in[w_out]
+        
         symbols = word.split()
         for i in range(len(symbols)-1):
             key = (symbols[i], symbols[i+1])
@@ -67,14 +76,6 @@ def merge_vocab(pair, v_in, update_set, pairs, pair2word, tokens):
         tokens[symbols[-1]] -= v_in[w_out]
         if tokens[symbols[-1]] == 0:
             del tokens[symbols[-1]]
-        
-        symbols = w_out.split()
-        for i in range(len(symbols)-1):
-            key = (symbols[i], symbols[i+1])
-            pairs[key] += v_in[w_out]
-            pair2word[key].add(w_out)
-            tokens[symbols[i]] += v_in[w_out]
-        tokens[symbols[-1]] += v_in[w_out]
     
     return v_in, pairs, pair2word, tokens
 
@@ -96,10 +97,12 @@ def bpe(srcname, dstname, dstname_vo, target_num):
             break
         best = max(pairs, key=pairs.get)
         store_best = pairs[best]
-        vocab, pairs, pair2word, sub_words = merge_vocab(best, vocab, copy.deepcopy(pair2word[best]), pairs, pair2word, sub_words)
+        update_set = copy.deepcopy(pair2word[best])
+        vocab, pairs, pair2word, sub_words = merge_vocab(best, vocab, update_set, pairs, pair2word, sub_words)
         cnt += 1
-        if cnt % 1 == 0:
-            print(cnt, 'iteration finish, the size of sub words is:', len(sub_words), ', best freq is:', store_best)
+        if cnt % 100 == 0:
+            print(cnt, 'iteration finish, the size of sub words is:', len(sub_words), ', best freq is:', store_best, ', example:', best)
+            print(len(update_set))
     print('there are', len(sub_words), 'sub words.')
     save_obj_dict(dstname, sub_words)
     save_obj_dict(dstname_vo, vocab)
