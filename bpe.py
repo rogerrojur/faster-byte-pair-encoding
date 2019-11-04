@@ -5,7 +5,7 @@ Created on Tue Oct 29 15:50:37 2019
 @author: 63184
 """
 
-import re, collections, json, copy
+import collections, json, copy
 
 def get_vocab(filenames):
     vocab = collections.defaultdict(int)
@@ -35,47 +35,71 @@ def get_stats(vocab):
     tokens = collections.defaultdict(int)
     for word, freq in vocab.items():
         symbols = word.split()
-        for i in range(len(symbols)-1):
-            key = (symbols[i],symbols[i+1])
-            pairs[key] += freq
-            pair2word[key].add(word)
-            tokens[symbols[i]] += freq
-        tokens[symbols[-1]] += freq
+        if symbols:
+            for i in range(len(symbols)-1):
+                key = (symbols[i],symbols[i+1])
+                pairs[key] += freq
+                pair2word[key].add(word)
+                tokens[symbols[i]] += freq
+            tokens[symbols[-1]] += freq
     return pairs, pair2word, tokens
 
 def merge_vocab(pair, v_in, update_set, pairs, pair2word, tokens):
-    bigram = re.escape(' '.join(pair))
+    #print('pair:', pair)
+    #bigram = re.escape(' '.join(pair))
+    #pair_combine = re.escape(''.join(pair))
+    #p = re.compile(r'(?<!\S)' + bigram + r'(?!\S)')
+    #bigram = ' '.join(pair)
     pair_combine = ''.join(pair)
-    p = re.compile(r'(?<!\S)' + bigram + r'(?!\S)')
     
     for word in update_set:
-        w_out = p.sub(pair_combine, word)
+        #w_out = p.sub(pair_combine, word)
+        word_split = word.split()
+        w_out_split = []
+        idx = 0
+        while idx <= len(word_split) - 2:
+            if pair == (word_split[idx], word_split[idx+1]):
+                w_out_split.append(pair_combine)
+                idx += 2
+            else:
+                w_out_split.append(word_split[idx])
+                idx += 1
+        if idx == len(word_split) - 1:
+            w_out_split.append(word_split[-1])
+        w_out = ' '.join(w_out_split)
+        #w_out = word.replace(bigram, pair_combine)
         v_in[w_out] = v_in[word]
         del v_in[word]
         
         symbols = w_out.split()
-        for i in range(len(symbols)-1):
-            key = (symbols[i], symbols[i+1])
-            pairs[key] += v_in[w_out]
-            pair2word[key].add(w_out)
-            tokens[symbols[i]] += v_in[w_out]
-        tokens[symbols[-1]] += v_in[w_out]
+        if symbols:
+            for i in range(len(symbols)-1):
+                key = (symbols[i], symbols[i+1])
+                pairs[key] += v_in[w_out]
+                pair2word[key].add(w_out)
+                #if symbols[i] not in tokens:
+                #    print(symbols[i])
+                tokens[symbols[i]] += v_in[w_out]
+            #if symbols[-1] not in tokens:
+            #    print(symbols[-1])
+            tokens[symbols[-1]] += v_in[w_out]
         
         symbols = word.split()
-        for i in range(len(symbols)-1):
-            key = (symbols[i], symbols[i+1])
-            pairs[key] -= v_in[w_out]
-            tokens[symbols[i]] -= v_in[w_out]
-            if tokens[symbols[i]] == 0:
-                del tokens[symbols[i]]
-            if word in pair2word[key]:
-                pair2word[key].remove(word)
-            if pairs[key] == 0:
-                del pairs[key]
-                del pair2word[key]
-        tokens[symbols[-1]] -= v_in[w_out]
-        if tokens[symbols[-1]] == 0:
-            del tokens[symbols[-1]]
+        if symbols:
+            for i in range(len(symbols)-1):
+                key = (symbols[i], symbols[i+1])
+                pairs[key] -= v_in[w_out]
+                tokens[symbols[i]] -= v_in[w_out]
+                if tokens[symbols[i]] == 0:
+                    del tokens[symbols[i]]
+                if word in pair2word[key]:
+                    pair2word[key].remove(word)
+                if len(pair2word[key]) == 0:
+                    del pairs[key]
+                    del pair2word[key]
+            tokens[symbols[-1]] -= v_in[w_out]
+            if tokens[symbols[-1]] == 0:
+                del tokens[symbols[-1]]
     
     return v_in, pairs, pair2word, tokens
 
@@ -102,7 +126,6 @@ def bpe(srcname, dstname, dstname_vo, target_num):
         cnt += 1
         if cnt % 100 == 0:
             print(cnt, 'iteration finish, the size of sub words is:', len(sub_words), ', best freq is:', store_best, ', example:', best)
-            print(len(update_set))
     print('there are', len(sub_words), 'sub words.')
     save_obj_dict(dstname, sub_words)
     save_obj_dict(dstname_vo, vocab)
